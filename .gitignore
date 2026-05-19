@@ -6,6 +6,10 @@ storage/*.db-*
 storage/imports/*
 storage/images/*
 img/
+*.png
+*.jpg
+*.jpeg
+*.webp
 !.gitkeep
 .env
 .DS_Store
