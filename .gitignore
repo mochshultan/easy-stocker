@@ -5,7 +5,6 @@ storage/*.db
 storage/*.db-*
 storage/imports/*
 storage/images/*
-img/
 *.png
 *.jpg
 *.jpeg
