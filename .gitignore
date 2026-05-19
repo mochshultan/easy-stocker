@@ -5,6 +5,7 @@ storage/*.db
 storage/*.db-*
 storage/imports/*
 storage/images/*
+img/*
 !.gitkeep
 .env
 .DS_Store
