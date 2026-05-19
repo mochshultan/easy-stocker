@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+storage/*.db
+storage/*.db-*
+storage/imports/*
+storage/images/*
+!.gitkeep
+.env
+.DS_Store
+npm-debug.log*
