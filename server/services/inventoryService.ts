@@ -15,6 +15,7 @@ import {
   stockMovementInputSchema
 } from "../../shared/stock.js";
 import type { StockDatabase } from "../storage/database.js";
+import path from "node:path";
 
 type ItemRow = {
   id: string;
@@ -27,6 +28,7 @@ type ItemRow = {
   min_quantity: number;
   image_path: string | null;
   notes: string | null;
+  source_file: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -83,6 +85,7 @@ export function createInventoryService(context: StockDatabase) {
       status: deriveStatus(Number(row.quantity), Number(row.min_quantity)),
       imagePath: row.image_path,
       notes: row.notes,
+      sourceFile: row.source_file,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -109,7 +112,7 @@ export function createInventoryService(context: StockDatabase) {
 
     if (search) {
       clauses.push(
-        "(LOWER(sku) LIKE LOWER(@search) OR LOWER(name) LIKE LOWER(@search) OR LOWER(category) LIKE LOWER(@search) OR LOWER(location) LIKE LOWER(@search))"
+        "(LOWER(sku) LIKE LOWER(@search) OR LOWER(name) LIKE LOWER(@search) OR LOWER(category) LIKE LOWER(@search) OR LOWER(location) LIKE LOWER(@search) OR LOWER(COALESCE(notes, '')) LIKE LOWER(@search))"
       );
       params.search = `%${search}%`;
     }
@@ -143,7 +146,7 @@ export function createInventoryService(context: StockDatabase) {
     return row ? rowToItem(row) : null;
   }
 
-  function upsertItem(rawInput: StockItemInput): { item: StockItem; created: boolean } {
+  function upsertItem(rawInput: StockItemInput, sourceFile?: string): { item: StockItem; created: boolean } {
     const input = stockItemInputSchema.parse(rawInput);
     const existing = getItemBySku(input.sku);
     const timestamp = now();
@@ -159,6 +162,7 @@ export function createInventoryService(context: StockDatabase) {
             min_quantity = @minQuantity,
             image_path = @imagePath,
             notes = @notes,
+            source_file = COALESCE(@sourceFile, source_file),
             updated_at = @updatedAt
         WHERE id = @id
       `).run({
@@ -171,6 +175,7 @@ export function createInventoryService(context: StockDatabase) {
         minQuantity: input.minQuantity,
         imagePath: input.imagePath ?? existing.imagePath,
         notes: input.notes ?? null,
+        sourceFile: sourceFile ?? null,
         updatedAt: timestamp
       });
 
@@ -181,11 +186,11 @@ export function createInventoryService(context: StockDatabase) {
     db.prepare(`
       INSERT INTO items (
         id, sku, name, category, location, unit, quantity, min_quantity,
-        image_path, notes, created_at, updated_at
+        image_path, notes, source_file, created_at, updated_at
       )
       VALUES (
         @id, @sku, @name, @category, @location, @unit, @quantity, @minQuantity,
-        @imagePath, @notes, @createdAt, @updatedAt
+        @imagePath, @notes, @sourceFile, @createdAt, @updatedAt
       )
     `).run({
       id,
@@ -198,6 +203,7 @@ export function createInventoryService(context: StockDatabase) {
       minQuantity: input.minQuantity,
       imagePath: input.imagePath ?? null,
       notes: input.notes ?? null,
+      sourceFile: sourceFile ?? null,
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -247,7 +253,8 @@ export function createInventoryService(context: StockDatabase) {
       updatedAt: now()
     });
 
-    return getItem(id);
+    const updated = getItem(id);
+    return updated;
   }
 
   function recordMovement(itemId: string, rawInput: StockMovementInput): {
@@ -302,8 +309,10 @@ export function createInventoryService(context: StockDatabase) {
         createdAt: timestamp
       });
 
+      const updatedItem = getItem(itemId);
+
       return {
-        item: getItem(itemId),
+        item: updatedItem,
         movement: getMovement(movementId)
       };
     })();
@@ -377,7 +386,7 @@ export function createInventoryService(context: StockDatabase) {
             imagePath: row.imagePath ?? null,
             notes: row.notes ?? null
           });
-          const result = upsertItem(parsed);
+          const result = upsertItem(parsed, storedPath);
           if (result.created) {
             created += 1;
           } else {
@@ -458,6 +467,91 @@ export function createInventoryService(context: StockDatabase) {
     });
   }
 
+  async function exportXlsx(): Promise<Buffer> {
+    const rawItems = listItems();
+    
+    // Urutkan berdasarkan merk (category) lalu nama barang
+    const items = rawItems.sort((a, b) => {
+      const catA = a.category || "";
+      const catB = b.category || "";
+      if (catA.toLowerCase() !== catB.toLowerCase()) {
+        return catA.localeCompare(catB);
+      }
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+    const ExcelJSModule = await import("exceljs");
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Inventory");
+
+    worksheet.columns = [
+      { header: "SKU", key: "sku", width: 15 },
+      { header: "Nama", key: "name", width: 30 },
+      { header: "Kategori", key: "category", width: 20 },
+      { header: "Lokasi", key: "location", width: 20 },
+      { header: "Satuan", key: "unit", width: 10 },
+      { header: "Jumlah", key: "quantity", width: 10 },
+      { header: "Minimum", key: "minQuantity", width: 10 },
+      { header: "Keterangan", key: "notes", width: 30 },
+      { header: "Image", key: "image", width: 15 }
+    ];
+
+    items.forEach((item, index) => {
+      let imageHyperlink = "";
+      if (item.imagePath) {
+        try {
+          const decodedPath = decodeURIComponent(item.imagePath);
+          const filename = decodedPath.split("/").pop() || "";
+          if (decodedPath.startsWith("/uploads/images/")) {
+            imageHyperlink = path.join(process.cwd(), "storage", "images", filename);
+          } else if (decodedPath.startsWith("/source-images/")) {
+            imageHyperlink = path.join(process.cwd(), "img", filename);
+          }
+        } catch (e) {
+          // Ignore
+        }
+      }
+
+      const row = worksheet.addRow({
+        sku: item.sku,
+        name: item.name,
+        category: item.category,
+        location: item.location,
+        unit: item.unit,
+        quantity: item.quantity,
+        minQuantity: item.minQuantity,
+        notes: item.notes || ""
+      });
+
+      if (imageHyperlink) {
+        row.getCell("image").value = {
+          text: String(index + 1),
+          hyperlink: `file:///${imageHyperlink.split("\\").join("/")}`,
+          tooltip: imageHyperlink
+        };
+        row.getCell("image").font = {
+          color: { argb: "FF0563C1" },
+          underline: true
+        };
+      }
+    });
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFD3D3D3" }
+    };
+
+    worksheet.getColumn("quantity").numFmt = "0.00";
+    worksheet.getColumn("minQuantity").numFmt = "0.00";
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer as any);
+  }
+
   function getMetrics(): DashboardMetrics {
     const items = listItems();
     return {
@@ -472,6 +566,7 @@ export function createInventoryService(context: StockDatabase) {
   return {
     attachImage,
     exportCsv,
+    exportXlsx,
     getItem,
     getItemBySku,
     getMetrics,

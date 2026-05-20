@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warehouse Rack 3D Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+
+  <!-- Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- TOP HEADER -->
+  <header id="top-bar">
+    <div class="header-logo">
+      <span class="logo-icon">▦</span>
+      <span class="logo-text">WAREHOUSE <strong>3D</strong></span>
+    </div>
+    <div class="header-subtitle">Sistem Visualisasi Lokasi Stok Barang</div>
+    <div class="header-legend">
+      <div class="legend-item" data-rack="A"><span class="dot" style="background:#00e5ff;box-shadow:0 0 8px #00e5ff"></span>RAK A</div>
+      <div class="legend-item" data-rack="B"><span class="dot" style="background:#69ff47;box-shadow:0 0 8px #69ff47"></span>RAK B</div>
+      <div class="legend-item" data-rack="C"><span class="dot" style="background:#ff6b35;box-shadow:0 0 8px #ff6b35"></span>RAK C</div>
+      <div class="legend-item" data-rack="D"><span class="dot" style="background:#ff47d4;box-shadow:0 0 8px #ff47d4"></span>RAK D</div>
+    </div>
+  </header>
+
+  <!-- STATS PANEL (top-right) -->
+  <div id="stats-panel">
+    <div class="stat-title">RINGKASAN STOK</div>
+    <div class="stat-row">
+      <span class="stat-label">Total Section</span>
+      <span class="stat-value" id="stat-total">128</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Terisi</span>
+      <span class="stat-value accent-cyan" id="stat-occupied">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Kosong</span>
+      <span class="stat-value accent-dim" id="stat-empty">128</span>
+    </div>
+    <div class="stat-bar-wrap">
+      <div class="stat-bar" id="stat-bar"></div>
+    </div>
+    <div class="stat-percent" id="stat-percent">0% terisi</div>
+  </div>
+
+  <!-- INFO PANEL (bottom-left) - shows on click -->
+  <div id="info-panel" style="display:none">
+    <div class="info-header">
+      <span class="info-icon">◉</span>
+      <span>DETAIL SECTION</span>
+    </div>
+    <div class="info-grid">
+      <div class="info-row">
+        <span class="info-key">RAK</span>
+        <span class="info-val" id="info-rack">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">BARIS</span>
+        <span class="info-val" id="info-row">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">SECTION</span>
+        <span class="info-val" id="info-section">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">STATUS</span>
+        <span class="info-val" id="info-status">—</span>
+      </div>
+    </div>
+    <button id="btn-toggle" onclick="window._toggleSelected()">TOGGLE STATUS</button>
+  </div>
+
+  <!-- CONTROLS HINT (bottom-center) -->
+  <div id="controls-hint">
+    <span>🖱 Drag: Putar</span>
+    <span>⚙ Scroll: Zoom</span>
+    <span>🖱 Klik Section: Toggle Terisi/Kosong</span>
+    <button id="btn-reset-cam" onclick="window._resetCamera()">Reset Kamera</button>
+    <button id="btn-clear-all" onclick="window._clearAll()">Kosongkan Semua</button>
+  </div>
+
+  <!-- SIDE QUICK-FILL PANEL -->
+  <div id="quick-panel">
+    <div class="quick-title">ISI CEPAT</div>
+    <div id="quick-racks"></div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

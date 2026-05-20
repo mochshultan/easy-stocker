@@ -100,4 +100,47 @@ describe("inventory service", () => {
     expect(csv).toContain("sku,name,category,location,unit,quantity,minQuantity,status");
     expect(csv).toContain("CUTTER-01");
   });
+
+  it("searches items by notes field", () => {
+    service.upsertItem({
+      sku: "BOLT-M8-01",
+      name: "Bolt M8",
+      category: "Fastener",
+      location: "Rack 1",
+      unit: "pcs",
+      quantity: 100,
+      minQuantity: 20,
+      imagePath: null,
+      notes: "Stainless steel, anti-karat, diameter 8mm"
+    });
+    service.upsertItem({
+      sku: "CABLE-01",
+      name: "Power Cable",
+      category: "Electrical",
+      location: "Rack 3",
+      unit: "meter",
+      quantity: 50,
+      minQuantity: 10,
+      imagePath: null,
+      notes: "NYM 3x2.5mm, tegangan 220V"
+    });
+
+    // Cari berdasarkan spesifikasi di notes
+    const resultAntikarat = service.listItems({ search: "anti-karat" });
+    expect(resultAntikarat).toHaveLength(1);
+    expect(resultAntikarat[0].sku).toBe("BOLT-M8-01");
+
+    const result220V = service.listItems({ search: "220V" });
+    expect(result220V).toHaveLength(1);
+    expect(result220V[0].sku).toBe("CABLE-01");
+
+    // Cari kata yang tidak ada di notes manapun
+    const resultNone = service.listItems({ search: "titanium" });
+    expect(resultNone).toHaveLength(0);
+
+    // Cari yang ada di nama barang (tidak boleh rusak)
+    const resultName = service.listItems({ search: "Bolt" });
+    expect(resultName).toHaveLength(1);
+    expect(resultName[0].sku).toBe("BOLT-M8-01");
+  });
 });

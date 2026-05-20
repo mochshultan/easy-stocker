@@ -57,10 +57,12 @@ function migrate(db: Database.Database) {
       min_quantity REAL NOT NULL CHECK (min_quantity >= 0),
       image_path TEXT,
       notes TEXT,
+      source_file TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
 
+    -- Try adding source_file if it doesn't exist (migration for existing DBs)
     CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
     CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
     CREATE INDEX IF NOT EXISTS idx_items_location ON items(location);
@@ -93,4 +95,10 @@ function migrate(db: Database.Database) {
       created_at TEXT NOT NULL
     );
   `);
+
+  try {
+    db.exec(`ALTER TABLE items ADD COLUMN source_file TEXT;`);
+  } catch (error) {
+    // Abaikan jika kolom sudah ada
+  }
 }

@@ -11,7 +11,7 @@ import {
 } from "../../shared/stock.js";
 import { parseStockFile } from "../services/importService.js";
 import { createAdminAuth } from "../services/adminAuth.js";
-import { createThumbnail, optimizeUploadedImage } from "../services/imageService.js";
+import { createThumbnail, preserveOriginalImage } from "../services/imageService.js";
 import { createInventoryService, InventoryError } from "../services/inventoryService.js";
 import type { StockDatabase } from "../storage/database.js";
 
@@ -39,7 +39,7 @@ export function registerInventoryRoutes(app: Express, context: StockDatabase) {
       destination: context.imagesDir,
       filename: (_request, file, callback) => callback(null, storedFileName(file.originalname))
     }),
-    limits: { fileSize: 8 * 1024 * 1024 },
+    limits: { fileSize: 100 * 1024 * 1024 }, // Bypass ke 100MB untuk gambar PNG resolusi tinggi
     fileFilter: (_request, file, callback) => {
       callback(null, imageExtensions.has(path.extname(file.originalname).toLowerCase()));
     }
@@ -117,7 +117,7 @@ export function registerInventoryRoutes(app: Express, context: StockDatabase) {
     }
 
     try {
-      const imagePath = await optimizeUploadedImage(request.file.path, context.imagesDir);
+      const imagePath = await preserveOriginalImage(request.file.path, context.imagesDir);
       response.json(service.attachImage(String(request.params.id), imagePath));
     } catch (error) {
       next(error);
@@ -141,6 +141,17 @@ export function registerInventoryRoutes(app: Express, context: StockDatabase) {
     response.setHeader("Content-Type", "text/csv; charset=utf-8");
     response.setHeader("Content-Disposition", `attachment; filename="stock-export-${dateSlug()}.csv"`);
     response.send(service.exportCsv());
+  });
+
+  router.get("/export.xlsx", async (_request, response, next) => {
+    try {
+      const buffer = await service.exportXlsx();
+      response.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      response.setHeader("Content-Disposition", `attachment; filename="stock-export-${dateSlug()}.xlsx"`);
+      response.send(buffer);
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.use("/api", router);
@@ -187,6 +198,7 @@ function errorHandler(error: unknown, _request: Request, response: Response, _ne
   }
 
   if (error instanceof multer.MulterError) {
+    console.error("[Multer Error]", error);
     response.status(400).json({ error: error.message });
     return;
   }
@@ -197,5 +209,8 @@ function errorHandler(error: unknown, _request: Request, response: Response, _ne
   }
 
   console.error(error);
-  response.status(500).json({ error: "Unexpected server error" });
+  console.error("[Internal Server Error]", error);
+  response.status(500).json({ error: "Internal Server Error" });
 }
+
+export { InventoryError };

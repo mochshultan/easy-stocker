@@ -45,6 +45,7 @@ export type StockItem = {
   status: ItemStatus;
   imagePath: string | null;
   notes: string | null;
+  sourceFile?: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -110,7 +110,9 @@ const sampleProps: DashboardViewProps = {
   onAdminSortChange: vi.fn(),
   onAdminPrev: vi.fn(),
   onAdminNext: vi.fn(),
-  onAdminDraftChange: vi.fn()
+  onAdminDraftChange: vi.fn(),
+  syncStatus: "",
+  onSyncToSource: vi.fn()
 };
 
 describe("dashboard accessibility", () => {

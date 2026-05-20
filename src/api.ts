@@ -31,7 +31,12 @@ async function request<T>(url: string, options: ApiRequestOptions = {}): Promise
     headers.set("x-admin-token", adminToken);
   }
 
-  const response = await fetch(url, {
+  // Bypass Vite proxy di mode DEV karena Vite proxy bisa crash saat mengunggah file > 5MB
+  const targetUrl = import.meta.env.DEV && url.startsWith("/api") 
+    ? `http://${window.location.hostname}:4174${url}` 
+    : url;
+
+  const response = await fetch(targetUrl, {
     ...requestOptions,
     headers
   });

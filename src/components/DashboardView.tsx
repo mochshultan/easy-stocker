@@ -171,15 +171,25 @@ export function DashboardView(props: DashboardViewProps) {
             <h1>Stock Data Operations</h1>
           </div>
           <div className="masthead-actions">
-            <a className="button secondary" href="/api/export.csv">
+            <button className="button secondary" type="button" onClick={() => {
+              const downloadLink = (url: string) => {
+                const a = document.createElement("a");
+                a.href = url;
+                // document.body.appendChild(a);
+                a.click();
+                // document.body.removeChild(a);
+              };
+              downloadLink('/api/export.csv');
+              downloadLink('/api/export.xlsx');
+            }}>
               <Download size={18} aria-hidden="true" />
-              Export CSV
-            </a>
-            <button className="button secondary" type="button" onClick={isAdmin ? props.onToggleAdminMode : props.onOpenAdminLogin}>
-              <Shield size={18} aria-hidden="true" />
-              {isAdmin ? "Modify Data" : "Admin Login"}
+              Export Data
             </button>
-            {isAdmin ? (
+            <button className="button secondary" type="button" onClick={props.isAdmin ? props.onToggleAdminMode : props.onOpenAdminLogin}>
+              <Shield size={18} aria-hidden="true" />
+              {props.isAdmin ? "Modify Data" : "Admin Login"}
+            </button>
+            {props.isAdmin ? (
               <button className="icon-button" type="button" onClick={props.onLogout} aria-label="Logout admin">
                 <LogOut size={18} aria-hidden="true" />
               </button>
@@ -402,7 +412,7 @@ export function DashboardView(props: DashboardViewProps) {
                   onChange={(event) => props.onNewItemImageChange(event.currentTarget.files?.[0] ?? null)}
                 />
               </label>
-              <CameraCapture onCapture={props.onNewItemImageChange} />
+              <CameraCapture onCapture={props.onNewItemImageChange} autoOpen={true} />
             </div>
             <div className="dialog-actions full-span">
               <button className="button secondary" type="button" onClick={props.onCloseItemForm}>
@@ -692,19 +702,43 @@ function AdminEditor(props: DashboardViewProps) {
         </button>
         {adminItem && adminDraft ? (
           <div className="admin-detail" aria-label={`Editing ${adminItem.name}`}>
-            <div className="admin-image">
-              {adminItem.imagePath ? (
-                <button className="admin-image-button" type="button" onClick={() => props.onOpenImagePreview(adminItem)}>
-                  <img
-                    src={thumbnailUrl(adminItem.imagePath, 640)}
-                    alt={`${adminItem.name} stock reference`}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </button>
-              ) : (
-                <span>No image</span>
-              )}
+            <div className="admin-image-panel" style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+              <div className="admin-image">
+                {adminItem.imagePath ? (
+                  <button className="admin-image-button" type="button" onClick={() => props.onOpenImagePreview(adminItem)}>
+                    <img
+                      src={thumbnailUrl(adminItem.imagePath, 640)}
+                      alt={`${adminItem.name} stock reference`}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </button>
+                ) : (
+                  <span>No image</span>
+                )}
+              </div>
+              <label className="file-drop" style={{ alignSelf: "center", width: "100%" }}>
+                <ImageIcon size={18} aria-hidden="true" />
+                <span>{adminItem.imagePath ? "Change Image" : "Upload Image"}</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    if (file && adminItem) {
+                      props.onImageUpload(adminItem, file);
+                      event.currentTarget.value = "";
+                    }
+                  }}
+                />
+              </label>
+              <CameraCapture
+                onCapture={(file) => {
+                  if (adminItem) {
+                    props.onImageUpload(adminItem, file);
+                  }
+                }}
+              />
             </div>
             <div className="form-grid admin-form">
               <TextInput label="SKU" value={String(adminDraft.sku ?? "")} onChange={(value) => props.onAdminDraftChange("sku", value)} required />
@@ -855,7 +889,7 @@ function ImagePreviewDialog({ item, onClose }: { item: StockItem; onClose: () =>
   );
 }
 
-function CameraCapture({ onCapture }: { onCapture: (file: File) => void }) {
+function CameraCapture({ onCapture, autoOpen = false }: { onCapture: (file: File) => void; autoOpen?: boolean }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -863,8 +897,14 @@ function CameraCapture({ onCapture }: { onCapture: (file: File) => void }) {
   const [deviceIndex, setDeviceIndex] = useState(0);
   const [active, setActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [cameraResolution, setCameraResolution] = useState("");
 
-  useEffect(() => () => stopCamera(), []);
+  useEffect(() => {
+    if (autoOpen) {
+      startCamera();
+    }
+    return () => stopCamera();
+  }, [autoOpen]);
 
   async function startCamera(index = deviceIndex) {
     setCameraError("");
@@ -880,13 +920,26 @@ function CameraCapture({ onCapture }: { onCapture: (file: File) => void }) {
       setDevices(cameras);
       const selected = cameras[index];
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: selected?.deviceId ? { deviceId: { exact: selected.deviceId } } : { facingMode: "environment" },
+        video: {
+          ...(selected?.deviceId ? { deviceId: { exact: selected.deviceId } } : { facingMode: "environment" }),
+          // Minta resolusi tertinggi yang bisa diberikan kamera
+          width:  { ideal: 3840, min: 1280 },
+          height: { ideal: 2160, min: 720 }
+        },
         audio: false
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        // Tampilkan resolusi aktual yang diberikan kamera
+        const track = stream.getVideoTracks()[0];
+        const settings = track?.getSettings();
+        if (settings?.width && settings?.height) {
+          setCameraResolution(`${settings.width}×${settings.height}`);
+        } else {
+          setCameraResolution("");
+        }
       }
       setActive(true);
       setDeviceIndex(index);
@@ -916,16 +969,18 @@ function CameraCapture({ onCapture }: { onCapture: (file: File) => void }) {
 
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
+    console.log(`[Camera] Capturing at ${canvas.width}×${canvas.height}`);
     const context = canvas.getContext("2d");
     context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Gunakan PNG (lossless) agar kualitas kamera tidak turun sebelum upload
     canvas.toBlob((blob) => {
       if (!blob) {
         setCameraError("Capture failed");
         return;
       }
-
-      onCapture(new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" }));
-    }, "image/jpeg", 0.9);
+      console.log(`[Camera] PNG blob size: ${(blob.size / 1024).toFixed(0)} KB`);
+      onCapture(new File([blob], `camera-${Date.now()}.png`, { type: "image/png" }));
+    }, "image/png");
   }
 
   return (
@@ -933,10 +988,12 @@ function CameraCapture({ onCapture }: { onCapture: (file: File) => void }) {
       <video ref={videoRef} playsInline muted aria-label="Camera preview" />
       <canvas ref={canvasRef} className="sr-only" />
       <div className="camera-actions">
-        <button className="small-button" type="button" onClick={() => startCamera()}>
-          <Camera size={16} aria-hidden="true" />
-          Open Camera
-        </button>
+        {!autoOpen && (
+          <button className="small-button" type="button" onClick={() => startCamera()}>
+            <Camera size={16} aria-hidden="true" />
+            Open Camera
+          </button>
+        )}
         <button className="small-button" type="button" onClick={switchCamera} disabled={!active || devices.length < 2}>
           Camera {devices.length ? deviceIndex + 1 : 1}
         </button>
@@ -947,6 +1004,7 @@ function CameraCapture({ onCapture }: { onCapture: (file: File) => void }) {
           Stop
         </button>
       </div>
+      {cameraResolution ? <p className="camera-info">Resolusi: {cameraResolution}</p> : null}
       {cameraError ? <p className="camera-error">{cameraError}</p> : null}
     </div>
   );

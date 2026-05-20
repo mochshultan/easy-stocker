@@ -6,16 +6,24 @@ import sharp from "sharp";
 import { InventoryError } from "./inventoryService.js";
 import type { StockDatabase } from "../storage/database.js";
 
-export async function optimizeUploadedImage(filePath: string, imagesDir: string): Promise<string> {
+/**
+ * Simpan gambar yang diupload dengan kualitas asli (tanpa kompresi/resize).
+ * Hanya melakukan auto-rotate berdasarkan EXIF, lalu copy ke imagesDir.
+ * File original dipertahankan apa adanya.
+ */
+export async function preserveOriginalImage(filePath: string, imagesDir: string): Promise<string> {
   const parsed = path.parse(filePath);
-  const fileName = `${parsed.name}-optimized.webp`;
+  // Pertahankan ekstensi asli, atau simpan sebagai PNG jika tidak dikenal
+  const ext = ['.jpg', '.jpeg', '.png', '.webp'].includes(parsed.ext.toLowerCase())
+    ? parsed.ext.toLowerCase()
+    : '.png';
+  const fileName = `${parsed.name}-original${ext}`;
   const outputPath = path.join(imagesDir, fileName);
 
+  // Hanya auto-rotate berdasarkan EXIF metadata — tidak ada resize, tidak ada kompresi ulang
   await sharp(filePath)
-    .rotate()
-    .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 82, effort: 4 })
-    .toFile(outputPath);
+    .rotate()           // koreksi orientasi EXIF
+    .toFile(outputPath); // simpan dengan codec & kualitas yang sama
 
   if (path.resolve(filePath) !== path.resolve(outputPath)) {
     await fsp.unlink(filePath).catch(() => undefined);
@@ -23,6 +31,7 @@ export async function optimizeUploadedImage(filePath: string, imagesDir: string)
 
   return `/uploads/images/${encodeURIComponent(fileName)}`;
 }
+
 
 export async function createThumbnail(context: StockDatabase, src: string, widthInput: number): Promise<string> {
   const sourcePath = resolveImagePath(context, src);

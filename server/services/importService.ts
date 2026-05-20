@@ -171,17 +171,79 @@ function numberValue(row: RawRow, aliases: readonly string[], fallback: number):
     return fallback;
   }
 
-  const numeric = raw.replace(/[^\d,.-]/g, "");
-  const hasComma = numeric.includes(",");
-  const hasDot = numeric.includes(".");
-  const cleaned =
-    hasComma && hasDot
-      ? numeric.replace(/\./g, "").replace(",", ".")
-      : hasComma
-        ? numeric.replace(",", ".")
-        : numeric;
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  // Parse format seperti "10 (2pcs)", "1 @ 2", "10 x 2", dll
+  const parsed = parseQuantityFormat(raw);
+  return parsed >= 0 ? parsed : fallback;
+}
+
+/**
+ * Parse quantity format dengan breakdown
+ * Contoh:
+ * - "10 (2pcs)" → 10 * 2 = 20
+ * - "1 @ 2" → 1 * 2 = 2
+ * - "10 x 2" → 10 * 2 = 20
+ * - "10*2" → 10 * 2 = 20
+ * - "100" → 100
+ */
+function parseQuantityFormat(raw: string): number {
+  const trimmed = String(raw).trim();
+  
+  // Pattern 1: "10 (2pcs)" atau "10(2)" - box quantity * content per box
+  const bracketPattern = /^(\d+(?:[.,]\d+)?)\s*[a-zA-Z\s]*\(\s*(\d+(?:[.,]\d+)?)/;
+  const bracketMatch = trimmed.match(bracketPattern);
+  if (bracketMatch) {
+    const boxQty = parseFloat(bracketMatch[1].replace(",", "."));
+    const contentPerBox = parseFloat(bracketMatch[2].replace(",", "."));
+    return Math.round(boxQty * contentPerBox * 100) / 100;
+  }
+
+  // Pattern 2: "1 @ 2" atau "1@2" - box quantity @ content per box
+  const atPattern = /^(\d+(?:[.,]\d+)?)\s*[a-zA-Z\s]*@\s*(\d+(?:[.,]\d+)?)/;
+  const atMatch = trimmed.match(atPattern);
+  if (atMatch) {
+    const boxQty = parseFloat(atMatch[1].replace(",", "."));
+    const contentPerBox = parseFloat(atMatch[2].replace(",", "."));
+    return Math.round(boxQty * contentPerBox * 100) / 100;
+  }
+
+  // Pattern 3: "10 x 2" atau "10x2" atau "10*2" - multiply operator
+  const multiplyPattern = /^(\d+(?:[.,]\d+)?)\s*[a-zA-Z\s]*[x*×]\s*(\d+(?:[.,]\d+)?)/i;
+  const multiplyMatch = trimmed.match(multiplyPattern);
+  if (multiplyMatch) {
+    const factor1 = parseFloat(multiplyMatch[1].replace(",", "."));
+    const factor2 = parseFloat(multiplyMatch[2].replace(",", "."));
+    return Math.round(factor1 * factor2 * 100) / 100;
+  }
+
+  // Pattern 4: "10 / 2" - divide operator (jarang tapi bisa saja)
+  const dividePattern = /^(\d+(?:[.,]\d+)?)\s*[a-zA-Z\s]*\/\s*(\d+(?:[.,]\d+)?)/;
+  const divideMatch = trimmed.match(dividePattern);
+  if (divideMatch) {
+    const numerator = parseFloat(divideMatch[1].replace(",", "."));
+    const denominator = parseFloat(divideMatch[2].replace(",", "."));
+    if (denominator !== 0) {
+      return Math.round(numerator / denominator * 100) / 100;
+    } else {
+      return 0; // Avoid division by zero
+    }
+  }
+
+  // Fallback: ambil angka di awal string
+  const match = trimmed.match(/^-?\d+(?:[.,]\d+)?/);
+  if (match) {
+    const numeric = match[0];
+    const hasComma = numeric.includes(",");
+    const hasDot = numeric.includes(".");
+    const cleaned =
+      hasComma && hasDot
+        ? numeric.replace(/\./g, "").replace(",", ".")
+        : hasComma
+          ? numeric.replace(",", ".")
+          : numeric;
+    const result = Number(cleaned);
+    return Number.isFinite(result) ? result : 0;
+  }
+  return 0;
 }
 
 function normalizeKeys(row: RawRow) {
