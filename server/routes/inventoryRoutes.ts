@@ -180,10 +180,57 @@ function dateSlug() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function errorHandler(error: unknown, _request: Request, response: Response, _next: NextFunction) {
+/**
+ * Convert technical error messages to user-friendly messages
+ */
+function getUserFriendlyErrorMessage(error: unknown, lang: "en" | "id" = "id"): string {
+  const errorStr = String(error);
+  
+  // Model warmup / Ollama not responding
+  if (errorStr.includes("NoResponseContent") || errorStr.includes("Ollama")) {
+    return lang === "id"
+      ? "🔄 Sedang mempersiapkan model, mohon tunggu sebentar..."
+      : "🔄 Warming up the model, please wait a moment...";
+  }
+
+  // Network/DNS errors
+  if (errorStr.includes("CurlDnsError") || errorStr.includes("ENOTFOUND") || errorStr.includes("DNS")) {
+    return lang === "id"
+      ? "⚠️ Ada masalah koneksi, silakan coba beberapa saat lagi."
+      : "⚠️ Connection issue, please try again in a moment.";
+  }
+
+  // Timeout errors
+  if (errorStr.includes("CurlTimeout") || errorStr.includes("ETIMEDOUT")) {
+    return lang === "id"
+      ? "⏱️ Permintaan timeout, silakan coba lagi."
+      : "⏱️ Request timed out, please try again.";
+  }
+
+  // TLS/SSL errors
+  if (errorStr.includes("CurlTlsError") || errorStr.includes("CERT")) {
+    return lang === "id"
+      ? "🔒 Ada masalah keamanan koneksi, hubungi admin."
+      : "🔒 Connection security issue, contact the administrator.";
+  }
+
+  // Server errors
+  if (errorStr.includes("502") || errorStr.includes("503") || errorStr.includes("500")) {
+    return lang === "id"
+      ? "❌ Sistem sedang mengalami gangguan, hubungi admin."
+      : "❌ System is experiencing issues, contact the administrator.";
+  }
+
+  return lang === "id" ? "Terjadi kesalahan" : "An error occurred";
+}
+
+function errorHandler(error: unknown, request: Request, response: Response, _next: NextFunction) {
+  // Detect user's language preference (simple heuristic)
+  const lang = request.headers["accept-language"]?.includes("id") ? "id" : "en";
+
   if (error instanceof ZodError) {
     response.status(422).json({
-      error: "Validation failed",
+      error: lang === "id" ? "Validasi gagal" : "Validation failed",
       details: error.flatten()
     });
     return;
@@ -199,18 +246,26 @@ function errorHandler(error: unknown, _request: Request, response: Response, _ne
 
   if (error instanceof multer.MulterError) {
     console.error("[Multer Error]", error);
-    response.status(400).json({ error: error.message });
+    const errorMsg = lang === "id" 
+      ? "Gagal mengunggah file" 
+      : "File upload failed";
+    response.status(400).json({ error: errorMsg });
     return;
   }
 
   if (error instanceof SyntaxError && "body" in error) {
-    response.status(400).json({ error: "Invalid JSON body" });
+    response.status(400).json({ 
+      error: lang === "id" ? "Format JSON tidak valid" : "Invalid JSON body" 
+    });
     return;
   }
 
-  console.error(error);
-  console.error("[Internal Server Error]", error);
-  response.status(500).json({ error: "Internal Server Error" });
+  // Log technical error for debugging
+  console.error("[Technical Error]", error);
+  
+  // Return user-friendly message
+  const userMessage = getUserFriendlyErrorMessage(error, lang);
+  response.status(500).json({ error: userMessage });
 }
 
 export { InventoryError };

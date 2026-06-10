@@ -13,3 +13,13 @@ storage/images/*
 .env
 .DS_Store
 npm-debug.log*
+
+# Development scratch files
+peek.mjs
+peek2.mjs
+peek3.mjs
+scratch.ts
+*.tmp.ts
+*.test.local.ts
+dummy.bin
+

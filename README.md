@@ -2,24 +2,51 @@
 
 Industrial stock data dashboard for maintaining item quantities, CSV/XLSX imports, CSV export, image references, and stock movement history.
 
-## Run
+> **🤖 Complete with Telegram Agent System** - Full agentic system for inventory management via Telegram bot powered by Ollama.
 
+## Quick Start
+
+### Setup (First Time Only)
+1. **Configure environment:** Copy `.env.example` to `.env` and fill in your credentials
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env  # Edit with your Telegram token and chat ID
+   ```
+
+2. **Setup Ollama LLM:**
+   - Download from https://ollama.ai
+   - Run `ollama serve` in a separate terminal
+   - Pull model: `ollama pull llama2:7b`
+
+3. **Get Telegram Bot Token:**
+   - Message @BotFather on Telegram
+   - Create new bot and get token
+   - Get your chat ID from @userinfobot
+
+📖 **Complete Setup Guide:** See [AGENT_SETUP.md](AGENT_SETUP.md)
+
+### Run
+
+#### Complete System (API + Web UI + Telegram Bot)
+```powershell
+npm run dev:all
+```
+
+#### Just API & Web UI
+```powershell
+npm run dev
+```
+
+#### Production
 ```powershell
 npm start
 ```
 
 Open `http://localhost:4174`.
 
-Admin mode uses:
-
+**Admin credentials:**
 - ID: `admin`
 - Password: `admin`
-
-For development:
-
-```powershell
-npm run dev
-```
 
 ## Data
 

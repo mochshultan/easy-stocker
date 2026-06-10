@@ -6,6 +6,7 @@
   "description": "Industrial stock data dashboard with CSV/XLSX import, image storage, and stock movement audit trail.",
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,green \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
+    "dev:all": "concurrently -n api,web,bot -c cyan,green,magenta \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\" \"nullclaw.exe gateway\"",
     "dev:api": "tsx watch server/index.ts",
     "build": "tsc -p tsconfig.node.json && vite build",
     "start": "node dist/server/index.js",
